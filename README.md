@@ -22,11 +22,15 @@
 
 ## Fase 2: Autenticação e Usuários
 
-[ ] 1. Endpoints de Autenticação: Criar as rotas /login e /register.
+[ ] 1. Conexão com o PostgreSQL: Configurar e testar a conexão do nosso app Go com o banco.
 
-[ ] 2. Geração de JWT: Implementar a lógica para gerar um token JWT no login bem-sucedido.
+[ ] 2. Modelagem e Criação da Tabela: Criar a tabela users no banco e o struct correspondente em Go.
 
-[ ] 3. Middleware de Autenticação: Proteger o endpoint WebSocket para que só usuários autenticados (com JWT válido) possam se conectar.
+[ ] 3. Endpoint de Registro (/register): Permitir que novos usuários se cadastrem de forma segura (com hash de senha).
+
+[ ] 4. Endpoint de Login (/login): Validar as credenciais e, se corretas, gerar e retornar um JWT.
+
+[ ] 5. Proteção do WebSocket: Modificar a rota /ws para que ela só aceite conexões que apresentem um JWT válido.
 
 ## Fase 3: Lógica do Chat e Persistência de Dados
 
@@ -49,4 +53,3 @@
 [ ] 3. Deploy Simples: Usar Docker Compose para rodar a aplicação e o banco de dados juntos.
 
 [ ] 4. Monitoramento (Bônus): Configurar métricas básicas com Prometheus para ficar de olho na saúde do servidor.
-

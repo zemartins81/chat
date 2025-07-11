@@ -38,20 +38,32 @@ func serveWs(hub *internal.Hub, w http.ResponseWriter, r *http.Request) {
 	go client.ReadPump()
 }
 
-
 func main() {
-	// Cria uma instância do Hub
+	connString := "postgres://user:password@localhost:5432/chatdb?sslmode=disable"
+	store, err := internal.NewStore(connString)
+	if err != nil {
+		log.Fatalf("Não foi possível conectar ao banco de dados: %v", err)
+	}
+
+	if err := store.Init(); err != nil {
+		log.Fatalf("Não foi possível inicializar o banco de dados: %v", err)
+	}
+
 	hub := internal.NewHub()
-	// Inicia o Hub em sua própria goroutine
 	go hub.Run()
 
-	// Define a rota /ws para usar nosso novo handler
+	// Cria uma instância do nosso Handler da API, injetando o store.
+	apiHandler := &internal.Handler{Store: store}
+
+	// Registra a nova rota de registro.
+	http.HandleFunc("/register", apiHandler.RegisterHandler)
+
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
 	})
 
-	log.Println("Servidor de WebSocket iniciado na porta :8080")
-	err := http.ListenAndServe(":8080", nil)
+	log.Println("Servidor iniciado na porta :8080")
+	err = http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatal("Erro ao iniciar o servidor: ", err)
 	}
