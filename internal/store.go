@@ -74,3 +74,27 @@ func (s *Store) CreateUser(ctx context.Context, user *User) error {
 	// Retorna nil se a inserção for bem-sucedida.
 	return nil
 }
+
+func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, error) {
+	var user User
+
+	query := `SELECT id, username, password, created_at FROM users WHERE username = $1`
+
+	err := s.db.QueryRow(ctx, query, username).Scan(&user.ID, &user.Username, &user.Password, &user.CreatedAt)
+	if err != nil {
+		return nil, errors.New("usuário não encontrado")
+	}
+
+	return &user, nil
+
+}
+
+func (s *Store) GetUserByID(ctx context.Context, id int) (*User, error) {
+	var user User
+	query := `SELECT id, username, created_at FROM users WHERE id = $1`
+	err := s.db.QueryRow(ctx, query, id).Scan(&user.ID, &user.Username, &user.CreatedAt)
+	if err != nil {
+		return nil, errors.New("usuário não encontrado")
+	}
+	return &user, nil
+}

@@ -21,19 +21,36 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func serveWs(hub *internal.Hub, w http.ResponseWriter, r *http.Request) {
+// serveWs agora recebe o store para buscar dados do usuário.
+func serveWs(hub *internal.Hub, store *internal.Store, w http.ResponseWriter, r *http.Request) {
+	// Extrai o userID do contexto, que foi adicionado pelo middleware.
+	userID, ok := r.Context().Value("userID").(int)
+	if !ok {
+		http.Error(w, "Não foi possível obter o ID do usuário", http.StatusInternalServerError)
+		return
+	}
+
+	// Busca os dados do usuário no banco.
+	user, err := store.GetUserByID(r.Context(), userID) // Precisaremos criar este método!
+	if err != nil {
+		http.Error(w, "Usuário não encontrado", http.StatusNotFound)
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	// Cria um novo cliente
+	// Cria o cliente com as informações do usuário.
 	client := internal.NewClient(hub, conn)
-	// Registra o cliente no Hub
-	client.Register()
+	client.UserID = user.ID
+	client.Username = user.Username
 
-	// Inicia as goroutines para ler e escrever mensagens para este cliente
+	client.Register()
+	log.Printf("Cliente conectado: %s (ID: %d)", client.Username, client.UserID)
+
 	go client.WritePump()
 	go client.ReadPump()
 }
@@ -44,7 +61,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Não foi possível conectar ao banco de dados: %v", err)
 	}
-
 	if err := store.Init(); err != nil {
 		log.Fatalf("Não foi possível inicializar o banco de dados: %v", err)
 	}
@@ -52,15 +68,16 @@ func main() {
 	hub := internal.NewHub()
 	go hub.Run()
 
-	// Cria uma instância do nosso Handler da API, injetando o store.
 	apiHandler := &internal.Handler{Store: store}
 
-	// Registra a nova rota de registro.
 	http.HandleFunc("/register", apiHandler.RegisterHandler)
+	http.HandleFunc("/login", apiHandler.LoginHandler)
 
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
+	// Protegendo a rota /ws com o middleware.
+	wsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serveWs(hub, store, w, r)
 	})
+	http.Handle("/ws", apiHandler.AuthMiddleware(wsHandler))
 
 	log.Println("Servidor iniciado na porta :8080")
 	err = http.ListenAndServe(":8080", nil)

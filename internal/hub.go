@@ -1,3 +1,5 @@
+// internal/hub.go
+
 package internal
 
 // Hub mantém o conjunto de clientes ativos e transmite mensagens para os clientes.
@@ -5,7 +7,8 @@ type Hub struct {
 	// Clientes registrados. A chave é um ponteiro para o Cliente, o valor é booleano.
 	clients map[*Client]bool
 
-	// Mensagens de entrada dos clientes.
+	// Canal de broadcast. Note que ele lida com []byte.
+	// Ele não se importa se o conteúdo é texto puro ou JSON.
 	broadcast chan []byte
 
 	// Canal para registrar solicitações de clientes.
@@ -47,7 +50,7 @@ func (h *Hub) Run() {
 					// A mensagem foi enviada com sucesso.
 				default:
 					// Se o canal `send` estiver bloqueado, o cliente está lento ou morto.
-					// O removemos.
+					// O removemos para evitar bloqueios futuros.
 					close(client.send)
 					delete(h.clients, client)
 				}
