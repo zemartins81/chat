@@ -30,21 +30,32 @@ func NewStore(connString string) (*Store, error) {
 
 // Init inicializa o banco de dados, criando as tabelas necessárias.
 func (s *Store) Init() error {
-	// Vamos criar a tabela de usuários se ela não existir.
-	createTableQuery := `
+	// Query para criar a tabela de usuários (já existente)
+	createUsersTableQuery := `
     CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(50) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`
-
-	_, err := s.db.Exec(context.Background(), createTableQuery)
+	_, err := s.db.Exec(context.Background(), createUsersTableQuery)
 	if err != nil {
 		return err
 	}
 
-	log.Println("Tabela 'users' verificada/criada com sucesso.")
+	// NOVA QUERY: para criar a tabela de salas
+	createRoomsTableQuery := `
+	CREATE TABLE IF NOT EXISTS rooms (
+		id SERIAL PRIMARY KEY,
+		name VARCHAR(50) UNIQUE NOT NULL,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+	);`
+	_, err = s.db.Exec(context.Background(), createRoomsTableQuery)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Tabelas 'users' e 'rooms' verificadas/criadas com sucesso.")
 	return nil
 }
 

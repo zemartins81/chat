@@ -1,6 +1,7 @@
 package internal
 
+// Message agora contém o corpo da mensagem e o nome da sala de destino.
 type Message struct {
-	Username string `json:"username,omitempty"`
-	Content  string `json:"content,omitempty"`
+	RoomName string
+	Body     []byte
 }

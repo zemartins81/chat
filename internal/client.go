@@ -22,6 +22,7 @@ type Client struct {
 	// ID e nome do usuário associado a este cliente.
 	UserID   int
 	Username string
+	Room     *Room
 }
 
 // NewClient cria uma nova instância de Client.
@@ -42,39 +43,60 @@ func (c *Client) Register() {
 // ReadPump lê mensagens do WebSocket e as envia para o hub.
 // Ele roda em sua própria goroutine para cada cliente.
 func (c *Client) ReadPump() {
-	// Garante que o cliente seja desregistrado e a conexão fechada ao sair.
 	defer func() {
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
 
 	for {
-		// Lê uma mensagem da conexão WebSocket.
 		_, rawMessage, err := c.conn.ReadMessage()
 		if err != nil {
-			// Se houver um erro (ex: cliente fechou a aba), sai do loop.
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error: %v", err)
 			}
 			break
 		}
 
-		// AQUI ESTÁ A LÓGICA NOVA:
-		// 1. Cria a mensagem estruturada com o nome de usuário e o conteúdo.
-		msg := Message{
-			Username: c.Username,
-			Content:  string(rawMessage),
+		var event Event
+		if err := json.Unmarshal(rawMessage, &event); err != nil {
+			log.Println("Erro ao desempacotar evento:", err)
+			continue
 		}
 
-		// 2. Converte (marshal) a struct para JSON.
-		jsonMessage, err := json.Marshal(msg)
-		if err != nil {
-			log.Println("Erro ao converter mensagem para JSON:", err)
-			continue // Pula para a próxima iteração se houver erro.
-		}
+		switch event.Type {
+		case "send_message":
+			var payload SendMessagePayload
+			if err := json.Unmarshal(event.Payload, &payload); err != nil {
+				log.Println("Erro no payload de send_message:", err)
+				continue
+			}
+			finalMsgBody, _ := json.Marshal(map[string]string{
+				"username": c.Username,
+				"content":  payload.Content,
+			})
+			c.hub.broadcast <- &Message{
+				RoomName: payload.Room,
+				Body:     finalMsgBody,
+			}
 
-		// 3. Envia a mensagem JSON para o canal de broadcast do Hub.
-		c.hub.broadcast <- jsonMessage
+		// LÓGICA DO JOIN ROOM IMPLEMENTADA
+		case "join_room":
+			var payload JoinRoomPayload
+			if err := json.Unmarshal(event.Payload, &payload); err != nil {
+				log.Println("Erro no payload de join_room:", err)
+				continue
+			}
+
+			// Cria a requisição e envia para o canal 'join' do Hub.
+			req := &JoinRequest{
+				Client:   c,
+				RoomName: payload.Room,
+			}
+			c.hub.join <- req
+
+		default:
+			log.Printf("Tipo de evento desconhecido: %s", event.Type)
+		}
 	}
 }
 
