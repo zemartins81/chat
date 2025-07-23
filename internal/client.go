@@ -70,13 +70,10 @@ func (c *Client) ReadPump() {
 				log.Println("Erro no payload de send_message:", err)
 				continue
 			}
-			finalMsgBody, _ := json.Marshal(map[string]string{
-				"username": c.Username,
-				"content":  payload.Content,
-			})
 			c.hub.broadcast <- &Message{
 				RoomName: payload.Room,
-				Body:     finalMsgBody,
+				Content:  payload.Content,
+				Username: c.Username,
 			}
 
 		// LÓGICA DO JOIN ROOM IMPLEMENTADA

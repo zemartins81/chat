@@ -55,7 +55,21 @@ func (s *Store) Init() error {
 		return err
 	}
 
-	log.Println("Tabelas 'users' e 'rooms' verificadas/criadas com sucesso.")
+	createMessagesTableQuery := `
+	CREATE TABLE IF NOT EXISTS messages (
+		id SERIAL PRIMARY KEY,
+		user_id INT NOT NULL,
+		username VARCHAR(50) NOT NULL,
+		room_name VARCHAR(50) NOT NULL,
+		content TEXT NOT NULL,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+	);`
+	_, err = s.db.Exec(context.Background(), createMessagesTableQuery)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Tabelas 'users', 'rooms' e 'messages' verificadas/criadas com sucesso.")
 	return nil
 }
 
@@ -97,7 +111,6 @@ func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, 
 	}
 
 	return &user, nil
-
 }
 
 func (s *Store) GetUserByID(ctx context.Context, id int) (*User, error) {
@@ -108,4 +121,53 @@ func (s *Store) GetUserByID(ctx context.Context, id int) (*User, error) {
 		return nil, errors.New("usuário não encontrado")
 	}
 	return &user, nil
+}
+
+func (s *Store) SaveMessage(ctx context.Context, message *Message) error {
+	query := `
+		INSERT INTO messages (user_id, username, room_name, content)
+		VALUES ($1, $2, $3, $4)
+		ReTURNING id, created_at;`
+
+	err := s.db.QueryRow(ctx, query,
+		message.UserID,
+		message.Username,
+		message.RoomName,
+		message.Content).Scan(&message.ID, &message.CreatedAt)
+
+	return err
+}
+
+// GetRoomMessages busca as últimas mensagens de uma sala
+func (s *Store) GetRoomMessages(ctx context.Context, roomName string, limit int) ([]*Message, error) {
+	query := `
+        SELECT id, user_id, username, room_name, content, created_at 
+        FROM messages 
+        WHERE room_name = $1 
+        ORDER BY created_at DESC 
+        LIMIT $2;`
+
+	rows, err := s.db.Query(ctx, query, roomName, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*Message
+	for rows.Next() {
+		var msg Message
+		err := rows.Scan(&msg.ID, &msg.UserID, &msg.Username,
+			&msg.RoomName, &msg.Content, &msg.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, &msg)
+	}
+
+	// Inverte a ordem para ficar cronológica (mais antiga primeiro)
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
+	return messages, nil
 }

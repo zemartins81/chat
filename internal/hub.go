@@ -1,6 +1,9 @@
 package internal
 
-import "log"
+import (
+	"encoding/json"
+	"log"
+)
 
 type Room struct {
 	Name    string
@@ -73,8 +76,16 @@ func (h *Hub) Run() {
 
 		case message := <-h.broadcast:
 			if room, ok := h.rooms[message.RoomName]; ok {
+				// Marshal the message to JSON once.
+				msgBytes, err := json.Marshal(message)
+				if err != nil {
+					log.Printf("Erro ao serializar mensagem para JSON: %v", err)
+					continue // Pula para a próxima iteração se houver erro.
+				}
+
 				for client := range room.clients {
-					client.send <- message.Body
+					// Envia o mesmo JSON para todos os clientes na sala.
+					client.send <- msgBytes
 				}
 			}
 		}
